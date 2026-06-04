@@ -928,3 +928,55 @@ async def test_paid_failure_reports_cost_on_error_meta(monkeypatch):
     assert data["error"]["code"] == "budget_exceeded"
     assert data["meta"]["cost_usd"] == 0.05
     assert data["meta"]["usage"]["input_tokens"] == 10
+
+
+@pytest.mark.parametrize("tool,args", [
+    ("claude_ask", {"prompt": "x"}),
+    ("claude_adversarial_review", {"target": "x"}),
+    ("claude_review_changes_async", {"scope": "working_tree"}),
+    ("claude_job_status", {"job_id": "j"}),
+    ("claude_job_result", {"job_id": "j"}),
+    ("claude_job_consume_result", {"job_id": "j"}),
+    ("claude_job_cancel", {"job_id": "j"}),
+    ("claude_review_dry_run", {"scope": "working_tree"}),
+    ("claude_job_list", {}),
+])
+async def test_workspace_error_branch_for_each_tool(tool, args):
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            tool, {**args, "workspace_root": "/no/such/dir/xyz"},
+            raise_on_error=False)
+    data = structured(result)
+    assert data["ok"] is False
+    assert data["error"]["code"] == "invalid_workspace_root"
+
+
+async def test_job_consume_and_cancel_not_found(tmp_path, monkeypatch, git_repo):
+    monkeypatch.setenv("CC_PLUGIN_CODEX_STATE_DIR", str(tmp_path / "state"))
+    async with Client(mcp) as client:
+        consume = structured(await client.call_tool(
+            "claude_job_consume_result",
+            {"job_id": "nope", "workspace_root": str(git_repo)},
+            raise_on_error=False))
+        cancel = structured(await client.call_tool(
+            "claude_job_cancel",
+            {"job_id": "nope", "workspace_root": str(git_repo)},
+            raise_on_error=False))
+    assert consume["error"]["code"] == "job_not_found"
+    assert cancel["error"]["code"] == "job_not_found"
+
+
+async def test_adversarial_and_async_resolve_error(fake_claude, monkeypatch, git_repo, tmp_path):
+    monkeypatch.setenv("CC_PLUGIN_CODEX_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CC_PLUGIN_CODEX_CLAUDE_CONFIG", "bogus")
+    async with Client(mcp) as client:
+        adv = structured(await client.call_tool(
+            "claude_adversarial_review",
+            {"target": "x", "workspace_root": str(git_repo)},
+            raise_on_error=False))
+        asy = structured(await client.call_tool(
+            "claude_review_changes_async",
+            {"scope": "working_tree", "workspace_root": str(git_repo)},
+            raise_on_error=False))
+    assert adv["error"]["code"] == "unsupported_config_mode"
+    assert asy["error"]["code"] == "unsupported_config_mode"
