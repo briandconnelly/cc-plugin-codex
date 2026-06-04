@@ -226,3 +226,20 @@ This v1 runs from the local checkout (not yet published to PyPI):
 ```
 codex mcp add cc-plugin-codex -- uv run --directory "$(pwd)" cc-plugin-codex-mcp
 ```
+
+### Tests
+
+```
+uv run pytest
+```
+
+The full suite enforces a 95% coverage floor. When iterating on a single file,
+bypass the gate with `--no-cov`:
+
+```
+uv run pytest tests/test_jobs.py --no-cov
+```
+
+The live Claude integration tests are excluded by default; run them with
+`uv run pytest -m integration --no-cov` (requires the `claude` CLI, and makes a
+small paid API call).

@@ -1,4 +1,5 @@
 import json
+import types
 
 import anyio
 import pytest
@@ -928,3 +929,204 @@ async def test_paid_failure_reports_cost_on_error_meta(monkeypatch):
     assert data["error"]["code"] == "budget_exceeded"
     assert data["meta"]["cost_usd"] == 0.05
     assert data["meta"]["usage"]["input_tokens"] == 10
+
+
+@pytest.mark.parametrize("tool,args", [
+    ("claude_ask", {"prompt": "x"}),
+    ("claude_adversarial_review", {"target": "x"}),
+    ("claude_review_changes_async", {"scope": "working_tree"}),
+    ("claude_job_status", {"job_id": "j"}),
+    ("claude_job_result", {"job_id": "j"}),
+    ("claude_job_consume_result", {"job_id": "j"}),
+    ("claude_job_cancel", {"job_id": "j"}),
+    ("claude_review_dry_run", {"scope": "working_tree"}),
+    ("claude_job_list", {}),
+])
+async def test_workspace_error_branch_for_each_tool(tool, args):
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            tool, {**args, "workspace_root": "/no/such/dir/xyz"},
+            raise_on_error=False)
+    data = structured(result)
+    assert data["ok"] is False
+    assert data["error"]["code"] == "invalid_workspace_root"
+
+
+async def test_job_consume_and_cancel_not_found(tmp_path, monkeypatch, git_repo):
+    monkeypatch.setenv("CC_PLUGIN_CODEX_STATE_DIR", str(tmp_path / "state"))
+    async with Client(mcp) as client:
+        consume = structured(await client.call_tool(
+            "claude_job_consume_result",
+            {"job_id": "nope", "workspace_root": str(git_repo)},
+            raise_on_error=False))
+        cancel = structured(await client.call_tool(
+            "claude_job_cancel",
+            {"job_id": "nope", "workspace_root": str(git_repo)},
+            raise_on_error=False))
+    assert consume["error"]["code"] == "job_not_found"
+    assert cancel["error"]["code"] == "job_not_found"
+
+
+async def test_adversarial_and_async_resolve_error(fake_claude, monkeypatch, git_repo, tmp_path):
+    monkeypatch.setenv("CC_PLUGIN_CODEX_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("CC_PLUGIN_CODEX_CLAUDE_CONFIG", "bogus")
+    async with Client(mcp) as client:
+        adv = structured(await client.call_tool(
+            "claude_adversarial_review",
+            {"target": "x", "workspace_root": str(git_repo)},
+            raise_on_error=False))
+        asy = structured(await client.call_tool(
+            "claude_review_changes_async",
+            {"scope": "working_tree", "workspace_root": str(git_repo)},
+            raise_on_error=False))
+    assert adv["error"]["code"] == "unsupported_config_mode"
+    assert asy["error"]["code"] == "unsupported_config_mode"
+
+
+def _fake_ctx(**over):
+    base = dict(truncated=False, truncation_hint=None, text="diff",
+                diff_bytes=4, redacted_paths=[], summary=None)
+    base.update(over)
+    return types.SimpleNamespace(**base)
+
+
+@pytest.mark.parametrize("tool,args", [
+    ("claude_review_changes", {"scope": "working_tree"}),
+    ("claude_adversarial_review", {"target": "x", "scope": "working_tree"}),
+    ("claude_review_changes_async", {"scope": "working_tree"}),
+    ("claude_review_dry_run", {"scope": "working_tree"}),
+])
+async def test_invalid_scope_from_gather_context(tool, args, monkeypatch, git_repo, tmp_path):
+    import cc_plugin_codex.server as srv
+    monkeypatch.setenv("CC_PLUGIN_CODEX_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setattr(srv, "gather_context",
+                        lambda *a, **k: (_ for _ in ()).throw(srv.InvalidScopeError("bad")))
+    async with Client(mcp) as client:
+        data = structured(await client.call_tool(
+            tool, {**args, "workspace_root": str(git_repo)}, raise_on_error=False))
+    assert data["error"]["code"] == "invalid_scope"
+
+
+@pytest.mark.parametrize("tool,args", [
+    ("claude_review_changes", {"scope": "working_tree"}),
+    ("claude_adversarial_review", {"target": "x", "scope": "working_tree"}),
+    ("claude_review_changes_async", {"scope": "working_tree"}),
+    ("claude_review_dry_run", {"scope": "working_tree"}),
+])
+async def test_internal_error_from_gather_context(tool, args, monkeypatch, git_repo, tmp_path):
+    import cc_plugin_codex.server as srv
+    monkeypatch.setenv("CC_PLUGIN_CODEX_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setattr(srv, "gather_context",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("git exploded")))
+    async with Client(mcp) as client:
+        data = structured(await client.call_tool(
+            tool, {**args, "workspace_root": str(git_repo)}, raise_on_error=False))
+    assert data["error"]["code"] == "internal_error"
+
+
+@pytest.mark.parametrize("tool,args", [
+    ("claude_review_changes", {"scope": "working_tree"}),
+    ("claude_adversarial_review", {"target": "x", "scope": "working_tree"}),
+    ("claude_review_changes_async", {"scope": "working_tree"}),
+])
+async def test_truncated_diff_is_context_too_large(tool, args, monkeypatch, git_repo, tmp_path):
+    import cc_plugin_codex.server as srv
+    monkeypatch.setenv("CC_PLUGIN_CODEX_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setattr(srv, "gather_context",
+                        lambda *a, **k: _fake_ctx(truncated=True, truncation_hint="too big"))
+    async with Client(mcp) as client:
+        data = structured(await client.call_tool(
+            tool, {**args, "workspace_root": str(git_repo)}, raise_on_error=False))
+    assert data["error"]["code"] == "context_too_large"
+    assert data["meta"]["truncated"] is True
+
+
+@pytest.mark.parametrize("tool", ["claude_review_changes", "claude_review_changes_async"])
+async def test_bad_base_ref_is_invalid_base(tool, fake_claude, monkeypatch, git_repo, tmp_path):
+    monkeypatch.setenv("CC_PLUGIN_CODEX_STATE_DIR", str(tmp_path / "state"))
+    async with Client(mcp) as client:
+        data = structured(await client.call_tool(
+            tool, {"scope": "branch", "base": "-badref", "workspace_root": str(git_repo)},
+            raise_on_error=False))
+    assert data["error"]["code"] == "invalid_base"
+
+
+async def test_adversarial_with_nonempty_diff_calls_claude(fake_claude, git_repo):
+    async with Client(mcp) as client:
+        data = structured(await client.call_tool(
+            "claude_adversarial_review",
+            {"target": "review", "scope": "working_tree",
+             "workspace_root": str(git_repo)}))
+    assert data["ok"] is True
+    assert data["verdict"] == "concerns"
+
+
+async def test_execute_nonzero_exit_non_json_stdout(monkeypatch, tmp_path):
+    import cc_plugin_codex.server as srv
+    from cc_plugin_codex.claude import ClaudeRun
+
+    async def fake_run(cmd, cwd, timeout_seconds):
+        return ClaudeRun(stdout="not json at all", stderr="boom",
+                         exit_code=1, elapsed_ms=5, timed_out=False)
+
+    monkeypatch.setattr(srv, "run_claude_async", fake_run)
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "claude_ask", {"prompt": "x", "workspace_root": str(tmp_path)},
+            raise_on_error=False)
+    assert structured(result)["ok"] is False
+
+
+async def test_file_roots_none_ctx_returns_empty():
+    from cc_plugin_codex.server import _file_roots
+    assert await _file_roots(None) == []
+
+
+def test_contained_by_value_error(monkeypatch):
+    import cc_plugin_codex.server as srv
+    monkeypatch.setattr(srv.os.path, "commonpath",
+                        lambda _paths: (_ for _ in ()).throw(ValueError("different drives")))
+    assert srv._contained_by("/a", "/b") is False
+
+
+async def test_status_version_probe_exception_keeps_version_none(monkeypatch):
+    import cc_plugin_codex.server as srv
+    monkeypatch.setattr(srv.shutil, "which", lambda _: "/usr/bin/claude")
+    monkeypatch.setattr(srv.subprocess, "run",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("cannot exec")))
+    monkeypatch.setattr(srv, "auth_status", lambda *a, **k: (True, "Logged in"))
+    _patch_full_flag_support(monkeypatch)
+    async with Client(mcp) as client:
+        data = structured(await client.call_tool("claude_status", {}))
+    assert data["claude_found"] is True
+    assert "claude_version" not in data            # None dropped by exclude_none
+
+
+async def test_capabilities_resource_returns_summary():
+    async with Client(mcp) as client:
+        contents = await client.read_resource("cc-plugin-codex://capabilities")
+    assert "cc-plugin-codex" in contents[0].text
+
+
+def test_main_runs_stdio(monkeypatch):
+    import cc_plugin_codex.server as srv
+    called = {}
+    monkeypatch.setattr(srv.mcp, "run", lambda **k: called.update(k))
+    srv.main()
+    assert called == {"transport": "stdio"}
+
+
+async def test_job_cancel_success_via_mcp(monkeypatch, git_repo, tmp_path):
+    import cc_plugin_codex.server as srv
+    monkeypatch.setenv("CC_PLUGIN_CODEX_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setattr(srv, "build_command",
+                        lambda *a, **k: (["sh", "-c", "sleep 30"], []))
+    async with Client(mcp) as client:
+        started = structured(await client.call_tool(
+            "claude_review_changes_async",
+            {"scope": "working_tree", "workspace_root": str(git_repo)}))
+        job_id = started["job_id"]
+        cancelled = structured(await client.call_tool(
+            "claude_job_cancel",
+            {"job_id": job_id, "workspace_root": str(git_repo)}))
+    assert cancelled["status"] == "cancelled"
