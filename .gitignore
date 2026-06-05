@@ -17,3 +17,6 @@ htmlcov/
 
 # Superpowers brainstorming/planning docs — kept locally, not committed
 docs/superpowers/
+
+# Codex local wrapper marketplace for testing this plugin checkout
+.codex-local-marketplace/
