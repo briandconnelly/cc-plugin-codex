@@ -1206,7 +1206,8 @@ async def test_async_result_reports_redacted_paths(monkeypatch, git_repo, tmp_pa
     assert ".env" in result["meta"]["redacted_paths"]
 
 
-async def test_dry_run_bad_base_is_structured_error(git_repo):
+async def test_dry_run_bad_base_is_structured_error(monkeypatch, git_repo):
+    _patch_full_flag_support(monkeypatch)
     async with Client(mcp) as client:
         data = structured(
             await client.call_tool(
