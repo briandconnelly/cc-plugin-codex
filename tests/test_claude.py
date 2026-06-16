@@ -108,6 +108,21 @@ def test_build_command_model():
     assert "--model" in cmd and "sonnet" in cmd
 
 
+def test_build_command_safe_mode():
+    cmd, _ = build_command(
+        prompt="hi",
+        config_mode="safe",
+        access="toolless",
+        model=None,
+        max_budget_usd=1.0,
+        flag_support=_NO_PROBE,
+    )
+    assert "--safe-mode" in cmd
+    assert "--strict-mcp-config" in cmd
+    assert "--mcp-config" in cmd
+    assert "--no-session-persistence" in cmd
+
+
 def test_build_command_always_send_flags_survive_when_probe_lists_them():
     # A successful probe that DOESN'T list a guarantee-bearing flag must not drop
     # it: such flags are never gated. Only the run-time error path catches their loss.
