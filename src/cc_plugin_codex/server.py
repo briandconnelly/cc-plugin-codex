@@ -1096,12 +1096,21 @@ async def claude_review_changes_async(
     )
     try:
         job_id, started_at = await run_sync(lambda: jobs.start_job(cmd, cwd, cfg))
-    except OSError:
+    except (FileNotFoundError, PermissionError):
         return _result(
             _err(
                 "claude_not_found",
                 "The `claude` CLI was not found on PATH.",
                 "Install Claude Code and ensure `claude` is on PATH.",
+                meta,
+            )
+        )
+    except OSError as e:
+        return _result(
+            _err(
+                "internal_error",
+                f"Failed to start async job: {e}",
+                "Check the workspace/job-state directory permissions and retry.",
                 meta,
             )
         )
