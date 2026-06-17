@@ -5,7 +5,7 @@ All notable changes to `cc-plugin-codex` will be documented in this file.
 This project uses pre-1.0 semantic versioning. Minor versions may change the
 agent-visible MCP surface; patch versions are reserved for compatible fixes.
 
-## 0.5.0 - 2026-06-17
+## Unreleased
 
 - Added optional `paths` filtering to diff-driven review tools so callers can
   review a repo-relative subset of a large diff without leaving the MCP review
