@@ -311,6 +311,8 @@ async def test_status_reports_invalid_env_defaults(monkeypatch):
     async with Client(mcp) as client:
         data = structured(await client.call_tool("claude_status", {}))
     assert data["ready"] is False
+    assert "default configuration is invalid" in data["readiness_detail"]
+    assert data["claude_authenticated"] is True
     assert data["raw_defaults"]["config_mode"] == "bogus"
     assert data["raw_defaults"]["access"] == "sideways"
     assert data["resolved_defaults"]["config_mode"] == "inherit"
@@ -354,7 +356,7 @@ async def test_claude_ask_returns_normalized(fake_claude):
     data = structured(result)
     assert data["ok"] is True
     assert data["verdict"] == "concerns"
-    assert data["meta"]["fingerprint"] == "cc-plugin-codex/0.1/schema-17"
+    assert data["meta"]["fingerprint"] == "cc-plugin-codex/0.1/schema-18"
 
 
 async def test_claude_ask_rejects_oversized_prompt_before_paid_call(monkeypatch, tmp_path):
@@ -479,6 +481,7 @@ async def test_status_reports_readiness(monkeypatch):
     assert data["claude_authenticated"] is True
     assert data["version_supported"] is True
     assert data["ready"] is True
+    assert data["readiness_detail"].startswith("ready:")
     assert "version_warning" not in data  # supported version -> no warning
     assert "flags_warning" not in data  # probe lists every expected flag
 
@@ -520,6 +523,7 @@ async def test_status_not_ready_when_logged_out(monkeypatch):
     data = structured(result)
     assert data["claude_authenticated"] is False
     assert data["ready"] is False
+    assert "no authenticated session" in data["readiness_detail"]
 
 
 async def test_env_default_config_mode_used(fake_claude, monkeypatch):
@@ -996,7 +1000,7 @@ async def test_capabilities_tool_returns_structured_contract():
     async with Client(mcp) as client:
         result = await client.call_tool("cc_codex_capabilities", {})
     data = structured(result)
-    assert data["fingerprint"] == "cc-plugin-codex/0.1/schema-17"
+    assert data["fingerprint"] == "cc-plugin-codex/0.1/schema-18"
     assert data["transport"] == "stdio"
     assert set(data["paid_tools"]) == {
         "claude_ask",
