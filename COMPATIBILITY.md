@@ -74,14 +74,23 @@ The bundled `.mcp.json` pins the server to a **versioned release tag**
 auto-ships to installed users — they update deliberately. The trade-off is that
 fixes (including resilience fixes) only reach users on the next tagged release.
 
-When cutting a release, bump these **together**:
+When cutting a release, bump these **together**. The `Publish` workflow's
+metadata-validation step (`.github/workflows/publish.yml`) hard-checks the
+items marked ✅ and aborts the release if any is missing, so omitting one is
+caught before publishing:
 
-1. `pyproject.toml` `version`
-2. `.codex-plugin/plugin.json` `version`
-3. `FINGERPRINT` in `src/cc_plugin_codex/schemas.py` — **only** when the
+1. `pyproject.toml` `version` ✅
+2. `.codex-plugin/plugin.json` `version` ✅
+3. the `@vX.Y.Z` ref in `.mcp.json` ✅
+4. `README.md` — the pinned `cc-plugin-codex==X.Y.Z` install example ✅
+5. `CHANGELOG.md` — a new `## X.Y.Z - YYYY-MM-DD` section ✅
+6. `FINGERPRINT` in `src/cc_plugin_codex/schemas.py` — **only** when the
    agent-visible surface changed (tool names, input/output schemas, the
-   `ErrorCode` set, the value enums, or the capability summary)
-4. the `@vX.Y.Z` ref in `.mcp.json`
+   `ErrorCode` set, the value enums, or the capability summary); not validated
+   by the workflow
+7. the `plugins/cc-plugin-codex/` mirror (`.codex-plugin/plugin.json` and
+   `.mcp.json`) — keep in sync with the root copies; not validated by the
+   workflow
 
 After the release commit is on `main`, publish by pushing the matching
 `vX.Y.Z` tag:
