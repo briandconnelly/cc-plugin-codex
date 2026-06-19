@@ -1,11 +1,11 @@
 ---
 name: collaborating-with-claude
-description: Use when you want an independent second opinion, a code review, or an adversarial critique from Claude Code while working in Codex. Triggers include finalizing risky changes, deciding between approaches, or pressure-testing a plan. Provides the cc-plugin-codex MCP tools and the rules for using them well.
+description: Use when you want an independent second opinion, a code review, or an adversarial critique from Claude Code while working in Codex. Triggers include finalizing risky changes, deciding between approaches, or pressure-testing a plan. Provides the claude-in-codex MCP tools and the rules for using them well.
 ---
 
 # Collaborating with Claude
 
-Use the `cc-plugin-codex` MCP tools to get bounded, independent critique from Claude Code.
+Use the `claude-in-codex` MCP tools to get bounded, independent critique from Claude Code.
 Claude is a reviewer, not a co-pilot: it never edits your code.
 
 **Pass `workspace_root` (an absolute repo path) on every paid call.**
