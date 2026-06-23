@@ -731,9 +731,9 @@ async def claude_ask(
     adversarial attack. Paid; read-only; blocks up to timeout_seconds;
     cancellable, not resumable. Free-form input is size-capped before spend.
 
-    Egress to Anthropic via `claude`: best-effort redaction covers only the
-    gathered diff sent to Claude — not your inputs, its output, or access=readonly
-    reads.
+    Egress to Anthropic via `claude`: this tool gathers no diff, so nothing is
+    redacted — your prompt/context, Claude's reply, and any access=readonly reads
+    are sent and relayed verbatim.
     """
     cwd, ws_err, ws_source = await _resolve_workspace(workspace_root, ctx)
     if ws_err:
@@ -2058,8 +2058,8 @@ def _capabilities_payload() -> dict:
             "claude_review_changes_async) send context to Anthropic via the `claude` CLI. "
             "Best-effort secret redaction is applied only to the server-gathered git diff "
             "before it is sent. It does NOT cover your free-form inputs (prompt, context, "
-            "evidence, focus), Claude's returned response, or files Claude reads directly "
-            "from the workspace under access=readonly. Use access=toolless and "
+            "target, evidence, focus), Claude's returned response, or files Claude reads "
+            "directly from the workspace under access=readonly. Use access=toolless and "
             "config_mode=safe/bare for sensitive workspaces; redaction is defense-in-depth, "
             "not a guarantee."
         ),
