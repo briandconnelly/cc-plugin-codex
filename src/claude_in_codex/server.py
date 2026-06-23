@@ -731,8 +731,9 @@ async def claude_ask(
     adversarial attack. Paid; read-only; blocks up to timeout_seconds;
     cancellable, not resumable. Free-form input is size-capped before spend.
 
-    Egress: context goes to Anthropic via `claude`; best-effort redaction covers
-    the gathered diff and output, not your inputs or access=readonly reads.
+    Egress to Anthropic via `claude`: best-effort redaction covers only the
+    gathered diff sent to Claude — not your inputs, its output, or access=readonly
+    reads.
     """
     cwd, ws_err, ws_source = await _resolve_workspace(workspace_root, ctx)
     if ws_err:
@@ -816,13 +817,13 @@ async def claude_review_changes(
 ) -> ToolResult:
     """Review a git diff with Claude and wait for the result.
 
-    For correctness, security, or test-coverage review of working_tree, staged,
-    or branch diff. Paid; read-only; blocks up to timeout_seconds; cancellable.
-    For long reviews use claude_review_changes_async. Empty diffs return without
-    spending.
+    Correctness, security, or test-coverage review of working_tree, staged, or
+    branch diff. Paid; read-only; blocks up to timeout_seconds; cancellable. For
+    long reviews use claude_review_changes_async. Empty diffs skip the call.
 
-    Egress: the diff goes to Anthropic via `claude`; best-effort redaction covers
-    the gathered diff and output, not your inputs or access=readonly reads.
+    Egress to Anthropic via `claude`: best-effort redaction covers only the
+    gathered diff sent to Claude — not your inputs, its output, or access=readonly
+    reads.
     """
     cwd, ws_err, ws_source = await _resolve_workspace(workspace_root, ctx)
     if ws_err:
@@ -992,8 +993,9 @@ async def claude_adversarial_review(
     attach a git diff with scope/base. Paid; read-only; blocks up to
     timeout_seconds; cancellable. Empty attached diff returns without spending.
 
-    Egress: context goes to Anthropic via `claude`; best-effort redaction covers
-    the gathered diff and output, not your inputs or access=readonly reads.
+    Egress to Anthropic via `claude`: best-effort redaction covers only the
+    gathered diff sent to Claude — not your inputs, its output, or access=readonly
+    reads.
     """
     cwd, ws_err, ws_source = await _resolve_workspace(workspace_root, ctx)
     if ws_err:
@@ -1219,8 +1221,9 @@ async def claude_review_changes_async(
     state; not resumable if cancelled. Poll/read/delete/stop via the
     claude_job_* tools. Empty diffs return without starting a job.
 
-    Egress: the diff goes to Anthropic via `claude`; best-effort redaction covers
-    the gathered diff and output, not your inputs or access=readonly reads.
+    Egress to Anthropic via `claude`: best-effort redaction covers only the
+    gathered diff sent to Claude — not your inputs, its output, or access=readonly
+    reads.
     """
     cwd, ws_err, ws_source = await _resolve_workspace(workspace_root, ctx)
     if ws_err:
@@ -2053,11 +2056,12 @@ def _capabilities_payload() -> dict:
         data_egress=(
             "Paid tools (claude_ask, claude_review_changes, claude_adversarial_review, "
             "claude_review_changes_async) send context to Anthropic via the `claude` CLI. "
-            "Best-effort secret redaction covers the server-gathered git diff and the "
-            "returned model output only — NOT your free-form inputs (prompt, context, "
-            "evidence, focus) or files Claude reads directly from the workspace under "
-            "access=readonly. Use access=toolless and config_mode=safe/bare for sensitive "
-            "workspaces; redaction is defense-in-depth, not a guarantee."
+            "Best-effort secret redaction is applied only to the server-gathered git diff "
+            "before it is sent. It does NOT cover your free-form inputs (prompt, context, "
+            "evidence, focus), Claude's returned response, or files Claude reads directly "
+            "from the workspace under access=readonly. Use access=toolless and "
+            "config_mode=safe/bare for sensitive workspaces; redaction is defense-in-depth, "
+            "not a guarantee."
         ),
         prerequisites=[
             "the `claude` CLI installed and authenticated",
