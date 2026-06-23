@@ -315,9 +315,9 @@ def redact_text(text: str) -> tuple[str, bool]:
     PEM/OpenSSH/PGP key-block handling (``_redact_key_content``), but with no
     diff-prefix or file-header awareness — every line is treated as content. A
     multi-line key block stays open until its END marker (or end of text), so an
-    unterminated block fails closed. Returns ``(scrubbed, changed)``; empty/None
-    input passes through unchanged. Defense-in-depth, NOT a guarantee: a key split
-    across separate fields is out of scope (see #66 / SECURITY.md).
+    unterminated block fails closed. Returns ``(scrubbed, changed)``; an empty
+    string passes through as ``("", False)``. Defense-in-depth, NOT a guarantee: a
+    key split across separate fields is out of scope (see #66 / SECURITY.md).
     """
     if not text:
         return text, False
