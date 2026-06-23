@@ -11,13 +11,13 @@ agent-visible MCP surface; patch versions are reserved for compatible fixes.
 
 - Explicit Anthropic data-egress disclosure on the agent-visible surface: each
   paid tool's description now states that context is sent to Anthropic via the
-  `claude` CLI and that best-effort secret redaction is applied only to the
-  server-gathered diff before it is sent — not to free-form inputs, Claude's
-  returned response, or files Claude reads directly under `access=readonly`. A
-  machine-readable `data_egress` field was added to `claude_capabilities`, and
-  `SECURITY.md` now spells out the same redaction limits. Part of the contract
-  fingerprint bump to `claude-in-codex/0.1/schema-24` (see the output-redaction
-  entry below for the rest of this unreleased surface change).
+  `claude` CLI and discloses what best-effort secret redaction does and does not
+  cover. A machine-readable `data_egress` field was added to
+  `claude_capabilities`, and `SECURITY.md` spells out the same limits. (Redaction
+  coverage was extended to Claude's returned output in #66 — see the Security
+  entry below for the current scope; free-form inputs and `access=readonly`
+  direct reads remain uncovered.) Part of the contract fingerprint bump to
+  `claude-in-codex/0.1/schema-24`.
 
 ### Security
 

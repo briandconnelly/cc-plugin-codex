@@ -731,9 +731,9 @@ async def claude_ask(
     adversarial attack. Paid; read-only; blocks up to timeout_seconds;
     cancellable, not resumable. Free-form input is size-capped before spend.
 
-    Egress to Anthropic via `claude`: this tool gathers no diff, so nothing is
-    redacted — your prompt/context, Claude's reply, and any access=readonly reads
-    are sent and relayed verbatim.
+    Egress to Anthropic via `claude`: gathers no diff. Your prompt/context and any
+    access=readonly reads are sent verbatim; Claude's returned reply is best-effort
+    secret-redacted before relay.
     """
     cwd, ws_err, ws_source = await _resolve_workspace(workspace_root, ctx)
     if ws_err:
